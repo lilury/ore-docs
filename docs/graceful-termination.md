@@ -3,129 +3,141 @@ sidebar_position: 5
 ---
 
 # Graceful Termination
+ 
 
-### Ore's Graceful Termination Features
+### Graceful Termination Overview
 
-Ore provides built-in tools to manage **graceful application termination** and **graceful context termination**,
-ensuring proper resource cleanup for services with Singleton or Scoped lifetimes. These features automate the orderly
-disposal of resources, allowing for clean and predictable shutdown processes.
+Ore provides tools to assist with **graceful application termination** and **graceful context termination**. It enables
+you to retrieve resolved instances of services, allowing you to manage resource cleanup based on your application's
+requirements. Ore integrates seamlessly with existing projects, supporting any custom cleanup interfaces you define.
 
----
+---  
 
 ### Graceful Application Termination
 
-On application termination, it is essential to clean up resources used by **Singleton** services, such as closing
-database connections, stopping background tasks, or flushing logs. Ore helps by identifying and invoking cleanup methods
-on only the **created Singleton instances**.
+During application termination, it is crucial to clean up resources used by Singleton services, such as closing database
+connections, stopping background tasks, or flushing logs. Ore simplifies this process by helping you retrieve resolved
+Singleton instances that implement specific interfaces.
 
 #### Key Features:
 
-1. **Interface-Based Cleanup**:
-    - Services implementing a specific cleanup interface (e.g., `Shutdowner`) are automatically identified.
-    - Uncreated (lazily registered) instances are ignored.
+1. **Custom Cleanup Interfaces**:
+    - Ore works with any interface you define for resource management, such as `Shutdowner`, `Closer`, or `Flusher`.
+    - These interfaces are part of **your application**, not Ore.
 
 2. **Dependency-Aware Order**:
-    - Services are shut down in reverse order of their resolution, ensuring dependencies are cleaned up first.
-    - Example: If `A` depends on `B` and `C`, `B` and `C` are shut down before `A`.
+    - Singleton services are retrieved in reverse resolution order, ensuring that dependencies are addressed before
+      their dependents.
 
-3. **Inclusive of Keyed Services**:
-    - Includes both regular and keyed Singleton instances.
+3. **Selective Retrieval**:
+    - Ore only retrieves Singleton instances that were resolved during the application's lifecycle. Unresolved
+      Singletons are excluded.
 
----
+---  
 
-#### Code Example:
+#### Example: Retrieving Resolved Singleton Instances
 
 ```go
-// Define a shutdown interface
+// Example cleanup interfaces defined in your application
 type Shutdowner interface {
   Shutdown()
+}
+type Closer interface {
+  Close()
 }
 
 // Register Singleton services
 ore.RegisterSingleton[Logger](&Logger{})               // *Logger implements Shutdowner
-ore.RegisterSingleton[DBRepository](&SomeRepository{})       // *SomeRepository implements Shutdowner
-ore.RegisterKeyedSingleton[HealthCheckService](&SomeService{}, "module") // *SomeService implements Shutdowner
+ore.RegisterSingleton[DBRepository](&SomeRepository{}) // *SomeRepository implements Closer
 
-// On application termination
-shutdowables := ore.GetResolvedSingletons[Shutdowner]() // Retrieve all resolved instances of Shutdowner
+// On application termination, retrieve resolved Singleton instances
+shutdownables := ore.GetResolvedSingletons[Shutdowner]()
+closeables := ore.GetResolvedSingletons[Closer]()
 
-// Shutdown all services
-for _, instance := range shutdowables {
-   instance.Shutdown()
+// Invoke cleanup methods
+for _, o := range shutdownables {
+  o.Shutdown()
 }
-```
+for _, o := range closeables {
+  o.Close()
+}
+```  
 
-**Key Notes**:
+**Note**: Ore only retrieves instances that have already been resolved. The actual cleanup logic (e.g., `Shutdown` or
+`Close` methods) is entirely up to your application.
 
-- Only Singleton instances that were resolved during the application lifetime are included.
-- Instances are returned in reverse resolution order, ensuring proper cleanup.
-
----
+---  
 
 ### Graceful Context Termination
 
-For services with **Scoped lifetimes**, cleanup should occur when their associated context is terminated. Ore helps
-manage this through the `Dispose()` method, invoked on all Scoped instances implementing a specific interface (e.g.,
-`Disposer`).
+For Scoped services, Ore helps manage cleanup when their associated context ends. It does so by allowing you to retrieve
+Scoped instances that match specific interfaces within the given context.
 
 #### Key Features:
 
-1. **Context-Specific Cleanup**:
-    - Only services resolved during the context lifetime are included in the cleanup process.
+1. **Custom Cleanup Interfaces**:
+    - Scoped cleanup works with any interface (e.g., `Disposer`, `Closer`, `Flusher`) defined in your application.
+    - Ore provides the means to retrieve Scoped instances implementing these interfaces.
 
 2. **Dependency-Aware Order**:
-    - Services are disposed of in reverse resolution order, ensuring dependencies are cleaned up first.
+    - Scoped instances are retrieved in reverse resolution order to ensure dependencies are addressed before dependents.
 
-3. **Inclusive of Keyed Services**:
-    - Includes both regular and keyed Scoped instances.
+3. **Context-Specific Retrieval**:
+    - Ore retrieves only Scoped instances that were resolved within the specific context, avoiding interference with
+      other contexts.
 
----
+---  
 
-#### Code Example:
+#### Example: Retrieving Scoped Instances
 
 ```go
-// Define a disposer interface
+// Example cleanup interfaces defined in your application
 type Disposer interface {
   Dispose()
 }
+type Flusher interface {
+  Flush()
+}
 
 // Register Scoped services
-ore.RegisterCreator[EmailService](ore.Scoped, &SomeDisposableService{}) // *SomeDisposableService implements Disposer
+ore.RegisterCreator[EmailService](ore.Scoped, &EmailService{}) // Implements Disposer
+ore.RegisterCreator[CacheService](ore.Scoped, &CacheService{}) // Implements Flusher
 
-// Simulate a new request with its own context
+// Simulate a context
 ctx, cancel := context.WithCancel(context.Background())
 
-// Start a goroutine to handle cleanup when the context is canceled
+// Cleanup on context termination
 go func() {
   <-ctx.Done() // Wait for context cancellation
-  disposables := ore.GetResolvedScopedInstances[Disposer](ctx) // Retrieve all resolved Scoped Disposer instances
+  disposables := ore.GetResolvedScopedInstances[Disposer](ctx)
+  flushables := ore.GetResolvedScopedInstances[Flusher](ctx)
+
+  // Invoke cleanup methods
   for _, d := range disposables {
-    d.Dispose() // Clean up resources
+    d.Dispose()
+  }
+  for _, f := range flushables {
+    f.Flush()
   }
 }()
 
-// Resolve a Scoped service
-ore.Get[*SomeDisposableService](ctx)
+// Resolve services in the context
+emailService, ctx := ore.Get[EmailService](ctx)
+cacheService, ctx := ore.Get[CacheService](ctx)
 
 // Simulate context cancellation
 cancel() // Triggers cleanup
-```
+```  
 
-**Key Notes**:
+**Note**: Ore does not perform the cleanup itself. It only retrieves resolved instances, leaving the cleanup logic to
+your application.
 
-- Only Scoped instances resolved within the specific context are included.
-- Instances are returned in reverse resolution order.
-
----
+---  
 
 ### Summary
 
-- **Application Termination**: Use `ore.GetResolvedSingletons[TInterface]()` to retrieve and clean up Singleton
-  instances during application shutdown.
-- **Context Termination**: Use `ore.GetResolvedScopedInstances[TInterface](context)` to clean up Scoped instances during
-  context cancellation.
-- **Dependency-Aware Cleanup**: Ore ensures that dependencies are shut down or disposed of before their dependents,
-  avoiding potential resource leaks or deadlocks.
-
-These features simplify resource management and make it easy to implement predictable and clean shutdown processes in
-applications using Ore.
+- Ore provides tools to retrieve resolved Singleton or Scoped instances using any user-defined interface.
+- **Application Termination**: Use `ore.GetResolvedSingletons` to retrieve resolved Singleton instances.
+- **Context Termination**: Use `ore.GetResolvedScopedInstances` to retrieve Scoped instances within a given context.
+- **Customizable Cleanup**: Ore works with any interface you define, ensuring seamless integration with existing
+  projects.
