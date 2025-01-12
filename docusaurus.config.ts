@@ -120,6 +120,10 @@ const config: Config = {
                     title: 'Community',
                     items: [
                         {
+                            label: 'GitHub',
+                            href: 'https://github.com/firasdarwish/ore',
+                        },
+                        {
                             label: 'Stack Overflow',
                             href: 'https://stackoverflow.com/questions/tagged/ore',
                         },
