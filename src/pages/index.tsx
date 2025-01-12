@@ -33,7 +33,7 @@ export default function Home(): ReactNode {
   const {siteConfig} = useDocusaurusContext();
   return (
     <Layout
-      title={`${siteConfig.title} | Lilury`}
+      title={``}
       description="Lightweight, Generic & Simple Dependency Injection Solution for Go">
       <HomepageHeader />
       <main>
