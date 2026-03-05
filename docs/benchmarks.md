@@ -10,19 +10,19 @@ goarch: amd64
 pkg: github.com/firasdarwish/ore
 cpu: 13th Gen Intel(R) Core(TM) i9-13900H
 BenchmarkRegisterFunc
-BenchmarkRegisterFunc-20         	 4785020	       210.3 ns/op
+BenchmarkRegisterFunc-20         	 5927286	       197.1 ns/op
 BenchmarkRegisterCreator
-BenchmarkRegisterCreator-20      	 6592044	       184.9 ns/op
+BenchmarkRegisterCreator-20      	 6831612	       181.5 ns/op
 BenchmarkRegisterSingleton
-BenchmarkRegisterSingleton-20    	 6123404	       214.0 ns/op
+BenchmarkRegisterSingleton-20    	 5541734	       200.1 ns/op
 BenchmarkInitialGet
-BenchmarkInitialGet-20           	 2663497	       431.1 ns/op
+BenchmarkInitialGet-20           	 2704546	       430.0 ns/op
 BenchmarkGet
-BenchmarkGet-20                  	11069119	       110.3 ns/op
+BenchmarkGet-20                  	10122558	       109.0 ns/op
 BenchmarkInitialGetList
-BenchmarkInitialGetList-20       	 1317560	       914.6 ns/op
+BenchmarkInitialGetList-20       	 1327143	       894.4 ns/op
 BenchmarkGetList
-BenchmarkGetList-20              	 4091818	       284.5 ns/op
+BenchmarkGetList-20              	 4105911	       285.8 ns/op
 PASS
 ```
 
